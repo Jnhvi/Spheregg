@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive 3D Sphere</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #1a1a2e; /* Dark purple background */
+            color: #e0e0e0;
+            user-select: none; /* Prevent text selection on drag */
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            touch-action: none; /* Prevent default touch actions like scrolling */
+        }
+        #scene-container {
+            width: 100%;
+            max-width: 800px; /* Max width for larger screens */
+            height: 70vh; /* Responsive height */
+            background-color: #0f0f1d; /* Slightly darker container */
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 20px;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border-radius: 15px; /* Match container border-radius */
+        }
+        #info {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.6);
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            color: #bbb;
+        }
+
+        @media (max-width: 768px) {
+            #scene-container {
+                height: 60vh;
+                margin: 10px;
+            }
+        }
+        @media (max-width: 480px) {
+            #scene-container {
+                height: 50vh; /* More height on small screens */
+                border-radius: 15px;
+            }
+            #info {
+                font-size: 0.8em;
+                bottom: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="scene-container">
+        <!-- Three.js will render the scene into this container -->
+        <div id="info">Drag to orbit the sphere</div>
+    </div>
+
+    <!-- Include Three.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        let scene, camera, renderer;
+        let sphere;
+        let mouseX = 0, mouseY = 0;
+        let targetX = 0, targetY = 0;
+        const windowHalfX = window.innerWidth / 2;
+        const windowHalfY = window.innerHeight / 2;
+
+        const container = document.getElementById('scene-container');
+
+        // Function to initialize the 3D scene
+        function init() {
+            // Scene: The stage where objects are placed
+            scene = new THREE.Scene();
+
+            // Camera: How we view the scene (PerspectiveCamera for 3D realism)
+            // Field of view (FOV), Aspect Ratio, Near clipping plane, Far clipping plane
+            camera = new THREE.PerspectiveCamera(75, container.offsetWidth / container.offsetHeight, 0.1, 1000);
+            camera.position.z = 5; // Move camera back to see the object
+
+            // Renderer: Renders the scene onto the canvas
+            renderer = new THREE.WebGLRenderer({ antialias: true }); // antialias for smoother edges
+            renderer.setSize(container.offsetWidth, container.offsetHeight); // Set size to match container
+            renderer.setPixelRatio(window.devicePixelRatio); // Use device pixel ratio for sharper image
+            container.appendChild(renderer.domElement); // Add canvas to the DOM
+
+            // Sphere Geometry: Define the shape of our object
+            const geometry = new THREE.SphereGeometry(1.5, 32, 32); // Radius, width segments, height segments
+
+            // Material: Define the appearance (color, shininess, etc.)
+            // Using a MeshPhongMaterial to react to light
+            const material = new THREE.MeshPhongMaterial({
+                color: 0x9b59b6, // Purple
+                specular: 0xecf0f1, // White specular highlight
+                shininess: 80
+            });
+
+            // Mesh: Combine geometry and material to create the object
+            sphere = new THREE.Mesh(geometry, material);
+            scene.add(sphere); // Add sphere to the scene
+
+            // Lighting: Essential for seeing Phong materials
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.5); // Soft ambient light
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1); // Bright white light from a direction
+            directionalLight.position.set(5, 5, 5).normalize(); // Position the light
+            scene.add(directionalLight);
+
+            // Event listeners for interactivity (mouse and touch)
+            container.addEventListener('mousemove', onMouseMove);
+            container.addEventListener('touchmove', onTouchMove, { passive: false });
+            container.addEventListener('touchstart', onTouchStart, { passive: false }); // To capture initial touch
+            container.addEventListener('touchend', onTouchEnd); // To stop rotation when touch ends
+
+            // Handle window resizing
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        // --- Event Handlers ---
+
+        function onWindowResize() {
+            // Update camera aspect ratio and renderer size on window resize
+            camera.aspect = container.offsetWidth / container.offsetHeight;
+            camera.updateProjectionMatrix(); // Recalculate projection matrix
+            renderer.setSize(container.offsetWidth, container.offsetHeight);
+        }
+
+        let isDragging = false;
+        let previousMouseX = 0;
+        let previousMouseY = 0;
+
+        function onMouseMove(event) {
+            // When mouse is pressed down, start tracking movement for rotation
+            if (event.buttons === 1) { // Left mouse button
+                if (!isDragging) {
+                    isDragging = true;
+                    previousMouseX = event.clientX;
+                    previousMouseY = event.clientY;
+                }
+                const deltaX = event.clientX - previousMouseX;
+                const deltaY = event.clientY - previousMouseY;
+
+                // Adjust rotation speed
+                sphere.rotation.y += deltaX * 0.01;
+                sphere.rotation.x += deltaY * 0.01;
+
+                previousMouseX = event.clientX;
+                previousMouseY = event.clientY;
+            } else {
+                isDragging = false;
+            }
+        }
+
+        // For touch events
+        function onTouchStart(event) {
+            event.preventDefault(); // Prevent scrolling
+            if (event.touches.length > 0) {
+                isDragging = true;
+                previousMouseX = event.touches[0].clientX;
+                previousMouseY = event.touches[0].clientY;
+            }
+        }
+
+        function onTouchMove(event) {
+            event.preventDefault(); // Prevent scrolling
+            if (isDragging && event.touches.length > 0) {
+                const currentX = event.touches[0].clientX;
+                const currentY = event.touches[0].clientY;
+
+                const deltaX = currentX - previousMouseX;
+                const deltaY = currentY - previousMouseY;
+
+                sphere.rotation.y += deltaX * 0.01;
+                sphere.rotation.x += deltaY * 0.01;
+
+                previousMouseX = currentX;
+                previousMouseY = currentY;
+            }
+        }
+
+        function onTouchEnd() {
+            isDragging = false;
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate); // Request the next frame
+
+            // If not dragging, slowly rotate the sphere
+            if (!isDragging) {
+                sphere.rotation.y += 0.005; // Continuous slow rotation
+            }
+
+            renderer.render(scene, camera); // Render the scene
+        }
+
+        // Start the scene on window load
+        window.onload = function() {
+            init(); // Initialize Three.js scene
+            animate(); // Start the animation loop
+        };
+    </script>
+</body>
+</html>
